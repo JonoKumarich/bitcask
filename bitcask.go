@@ -3,10 +3,14 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 )
 
 const HeaderSize = 8 // Maybe link this to entry struct
+const KeySizeLoc = 0
+const KeySize = 4
+const ValueSize = 4
 
 func main() {
 	file := "output"
@@ -138,4 +142,35 @@ func (e *FileEntry) ToBytes() []byte {
 	result = append(result, key[:]...)
 	result = append(result, value[:]...)
 	return result
+}
+
+func ParseLogs(reader io.Reader) map[string][]byte {
+	keyDir := map[string][]byte{}
+
+	for {
+		var keyLength uint32
+		err := binary.Read(reader, binary.BigEndian, &keyLength)
+
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			panic(err)
+		}
+
+		var valLength uint32
+		err = binary.Read(reader, binary.BigEndian, &valLength)
+		if err != nil {
+			panic(err)
+		}
+
+		keyBuf := make([]byte, keyLength)
+		_, err = io.ReadFull(reader, keyBuf)
+
+		valBuf := make([]byte, valLength)
+		_, err = io.ReadFull(reader, valBuf)
+
+		keyDir[string(keyBuf)] = valBuf
+	}
+
+	return keyDir
 }

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"reflect"
 	"testing"
 )
@@ -63,5 +65,50 @@ func TestBitcaskGet(t *testing.T) {
 
 	if got != value {
 		t.Errorf("got %q, want %q", got, value)
+	}
+}
+
+func TestLogParser(t *testing.T) {
+	testData := map[string][]byte{
+		"key1": []byte("value1"),
+		"key2": []byte("value2"),
+	}
+
+	var buf bytes.Buffer
+	for key, val := range testData {
+		keyLength := uint32(len(key))
+		if err := binary.Write(&buf, binary.BigEndian, keyLength); err != nil {
+			t.Fatalf("Failed to write key length: %v", err)
+		}
+
+		valLength := uint32(len(val))
+		if err := binary.Write(&buf, binary.BigEndian, valLength); err != nil {
+			t.Fatalf("Failed to write value length: %v", err)
+		}
+
+		if _, err := buf.Write([]byte(key)); err != nil {
+			t.Fatalf("Failed to write key: %v", err)
+		}
+
+		if _, err := buf.Write(val); err != nil {
+			t.Fatalf("Failed to write value: %v", err)
+		}
+	}
+
+	result := ParseLogs(&buf)
+
+	for key, expectedVal := range testData {
+		actualVal, exists := result[key]
+		if !exists {
+			t.Errorf("Key %q not found in result", key)
+			continue
+		}
+		if !bytes.Equal(actualVal, expectedVal) {
+			t.Errorf("Value for key %q = %q; want %q", key, actualVal, expectedVal)
+		}
+	}
+
+	if len(result) != len(testData) {
+		t.Errorf("Result has %d entries; want %d", len(result), len(testData))
 	}
 }
