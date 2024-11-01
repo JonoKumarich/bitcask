@@ -1,11 +1,33 @@
-package bitcast
+package main
 
 import (
 	"encoding/binary"
 	"fmt"
+	"os"
 )
 
 const HeaderSize = 8 // Maybe link this to entry struct
+
+func main() {
+	file := "output"
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE, 0644)
+	defer f.Close()
+
+	if err != nil {
+		panic(err)
+	}
+
+	storage := FileStorage{f}
+	bitcask := Bitcask{&storage, map[string][]byte{}}
+	bitcask.Put("name", "Jono")
+	output, _ := bitcask.Get("name")
+	bitcask.Put("blah", "blahblah")
+	fmt.Println(output)
+	output, _ = bitcask.Get("blah")
+	fmt.Println(output)
+	output, _ = bitcask.Get("name")
+	fmt.Println(output)
+}
 
 type Storage interface {
 	Write(row []byte)
@@ -27,6 +49,41 @@ func (s *MemoryStorage) Tell() int {
 
 func (s *MemoryStorage) Pull(start, end int) []byte {
 	return s.Data[start:end]
+}
+
+type FileStorage struct {
+	file *os.File
+}
+
+func (s *FileStorage) Write(row []byte) {
+	_, err := s.file.Write(row)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (s *FileStorage) Pull(start, end int) []byte {
+	length := end - start
+	buf := make([]byte, length)
+	_, err := s.file.ReadAt(buf, int64(start))
+	if err != nil {
+		panic(err)
+	}
+	return buf
+}
+
+func (s *FileStorage) Tell() int {
+	info, err := s.file.Stat()
+	if err != nil {
+		panic(err)
+	}
+	return int(info.Size())
+}
+
+func (s *FileStorage) Close() {
+	if err := s.file.Close(); err != nil {
+		panic(err)
+	}
 }
 
 type Bitcask struct {

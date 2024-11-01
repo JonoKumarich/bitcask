@@ -1,4 +1,4 @@
-package bitcast
+package main
 
 import (
 	"reflect"
